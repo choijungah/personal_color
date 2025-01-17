@@ -4,3 +4,4 @@ opencv-python
 dlib
 numpy
 scikit-learn
+dlib==19.22.0
