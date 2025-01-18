@@ -1,14 +1,22 @@
-# app.py
 import streamlit as st
 import requests
 import os
+from PIL import Image
 
 def main():
-    st.title("Personal Color - Streamlit (app.py)")
-    st.subheader("No upload here. We just fetch the last predicted result from FastAPI.")
+    # 1) 페이지 레이아웃
+    st.set_page_config(layout="wide")
 
-    # 1) FastAPI의 /last_result 에서 최근 퍼스널컬러 가져오기
-    #    (미리 main.py에서 /predict 로 이미지 업로드 & 예측을 한번 진행했다고 가정)
+    # 2) 상단 메뉴, 푸터 감추기
+    hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+    """
+    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+    # 3) FastAPI의 /last_result 에서 최근 퍼스널컬러 가져오기
     fastapi_url = "http://127.0.0.1:8000/last_result"
 
     try:
@@ -19,17 +27,76 @@ def main():
         return
 
     data = response.json()
-    # data 예: {"personal_color": "spring"} or {"error": "..."}
     if "error" in data:
         st.error(f"Server error: {data['error']}")
         return
 
     personal_color = data["personal_color"]
-    st.success(f"Your personal color is: {personal_color}")
+    image_path = data.get("image_path")
 
-    # 2) 해당 폴더(../../images/{personal_color})에 있는 모든 이미지를 띄우기
-    base_dir = os.path.dirname(__file__)  # app.py가 위치한 폴더 (pages/)
-    folder_path = os.path.join(base_dir, "..", "..", "images", personal_color)
+    # ───────────── 텍스트를 HTML로 가운데 정렬 ─────────────
+    st.markdown("<h1 style='text-align:center;'>퍼스널 컬러 진단 중 ...</h1>", unsafe_allow_html=True)
+
+    # 퍼스널컬러별 안내문 (subheader 대신 Markdown + HTML)
+    if personal_color == "spring":
+        st.markdown(
+            "<h3 style='text-align:center;'>(테이비) 님의 퍼스널 컬러는 Spring Warm 입니다.</h3>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<p style='text-align:center;'>이 퍼스널 컬러에 해당하는 연예인으로는 아이유, 이종석, 윈터, 윤아 등이 있습니다.</p>",
+            unsafe_allow_html=True
+        )
+    elif personal_color == "summer":
+        st.markdown(
+            "<h3 style='text-align:center;'>(테이비) 님의 퍼스널 컬러는 Summer Cool 입니다.</h3>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<p style='text-align:center;'>이 퍼스널 컬러에 해당하는 연예인으로는 정채연, 아이린, 장원영, 태연 등이 있습니다.</p>",
+            unsafe_allow_html=True
+        )
+    elif personal_color == "autumn":
+        st.markdown(
+            "<h3 style='text-align:center;'>(테이비) 님의 퍼스널 컬러는 Autumn Warm 입니다.</h3>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<p style='text-align:center;'>이 퍼스널 컬러에 해당하는 연예인으로는 제니, 이효리, 신세경, 이성경 등이 있습니다.</p>",
+            unsafe_allow_html=True
+        )
+    elif personal_color == "winter":
+        st.markdown(
+            "<h3 style='text-align:center;'>(테이비) 님의 퍼스널 컬러는 Winter Cool 입니다.</h3>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<p style='text-align:center;'>이 퍼스널 컬러에 해당하는 연예인으로는 지수, 김혜수, 카리나, 임지연 등이 있습니다.</p>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            f"<h3 style='text-align:center;'>(테이비) 님의 퍼스널 컬러는 {personal_color} 입니다.</h3>",
+            unsafe_allow_html=True
+        )
+
+    # ───────────── 업로드된 원본 이미지를 가운데 정렬, 크게 표시 ─────────────
+    if image_path:
+        try:
+            uploaded_image = Image.open(image_path)
+            uploaded_image = uploaded_image.resize((400, 600))
+
+            # 이미지 앞뒤로 <div style='text-align:center;'> ... </div> 감싸기
+            st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)  # 추가
+            st.image(uploaded_image, caption="업로드된 이미지", use_container_width=False, width=400)
+            st.markdown("</div>", unsafe_allow_html=True)  # 추가
+
+        except Exception as e:
+            st.error(f"Failed to load image: {e}")
+
+    # 4) 해당 폴더(../../images/{personal_color})에 있는 모든 이미지를 띄우기
+    base_dir = os.path.dirname(__file__)
+    folder_path = os.path.abspath(os.path.join(base_dir, "..", "..", "images", personal_color))
 
     if os.path.isdir(folder_path):
         image_files = [
@@ -39,10 +106,17 @@ def main():
         if not image_files:
             st.warning(f"No images found in {folder_path}")
         else:
-            st.write(f"Found {len(image_files)} images in {folder_path}:")
-            for image_file in sorted(image_files):
+            # 이미지들을 4개씩 가로로 나열
+            cols = st.columns(4)
+            for i, image_file in enumerate(sorted(image_files)):
                 full_path = os.path.join(folder_path, image_file)
-                st.image(full_path, caption=image_file)
+                with cols[i % 4]:
+                    try:
+                        color_image = Image.open(full_path)
+                        color_image = color_image.resize((150, 225))
+                        st.image(color_image, caption=image_file, use_container_width=False, width=150)
+                    except Exception as e:
+                        st.error(f"Failed to load image {image_file}: {e}")
     else:
         st.warning(f"Folder not found: {folder_path}")
 
